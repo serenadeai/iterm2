@@ -20,9 +20,15 @@ In `serenade.py`, when the script is launched in iTerm, a new instance of the `C
 
 1. Download iTerm from https://iterm2.com/index.html.
 1. Download `serenade-shell-integration.{bash,zsh}` from https://github.com/serenadeai/serenade-hyper/tree/main/bin to your home directory, and add `source ~/serenade-shell-integration.{bash,zsh}` to `.{bash,zsh}rc`.
-1. Use Scripts > Manage > Import... to import this script (coming soon).
+1. Use Scripts > Manage > Import... to import this script automatically (coming soon).
 
 ## Development
 
-1. Clone this repo, and run `ln -s <path-to-this-repository> ~/Library/Application\ Support/iTerm2/Scripts/serenade` to create a symlink.
-1. In iTerm, use Scripts > serenade > serenade.py ... to start the script, and Scripts > Manage > console to see output or restart the script.
+1. Clone this repo, and from this repo, run:
+   
+```
+ln -s "$(pwd)"/serenade ~/Library/Application\ Support/iTerm2/Scripts
+ln -s "$(pwd)"/AutoLaunch.scpt ~/Library/Application\ Support/iTerm2/Scripts
+```
+1. Restart iTerm and `serenade/serenade.py` should be launched automatically in the background.
+1. In iTerm, use Scripts > Manage > console to see output or restart the script.
