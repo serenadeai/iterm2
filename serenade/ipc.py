@@ -9,7 +9,7 @@ class Ipc:
         self.command_handler = command_handler
         self.websocket = None
 
-        app = "terminal"
+        app = "iterm"
         self.plugin_id = str(uuid.uuid4())
         self.active_message = {
             "app": app,
@@ -20,14 +20,14 @@ class Ipc:
         self.heartbeat_task = asyncio.create_task(self.heartbeat())
 
     async def retry_connection(self):
-        try:
-            await self.connect()
-        except (OSError, websockets.exceptions.ConnectionClosedError):
-            self.websocket = None
-            # print("Could not connect")
-            await asyncio.sleep(1)
-            # print ("Retrying ...")
-            await self.retry_connection()
+        while True:
+            try:
+                await self.connect()
+            except (OSError, websockets.exceptions.ConnectionClosedError):
+                self.websocket = None
+                # print("Could not connect")
+                await asyncio.sleep(1)
+                # print ("Retrying ...")
 
     async def connect(self):
         async with websockets.connect(self.url) as websocket:
