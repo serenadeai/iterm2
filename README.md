@@ -20,7 +20,10 @@ In `serenade.py`, when the script is launched in iTerm, a new instance of the `C
 
 1. Download iTerm from https://iterm2.com/index.html.
 1. Download `serenade-shell-integration.{bash,zsh}` from https://github.com/serenadeai/serenade-hyper/tree/main/bin to your home directory, and add `source ~/serenade-shell-integration.{bash,zsh}` to `.{bash,zsh}rc`.
-1. Use Scripts > Manage > Import... to import this script automatically (coming soon).
+1. Run `./install.sh` to symlink scripts to iTerm's Scripts directory.
+1. Restart iTerm, and you should automatically be prompted to install a Python runtime for scripts:
+   <img src="readme/runtime_prompt.png" width=200 />
+    - Alternatively, you can use the menu item under Scripts > Manage > Install Python Runtime.
 
 ## Development
 
