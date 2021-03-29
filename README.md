@@ -1,6 +1,33 @@
 # Serenade for iTerm2
 
-### Implementation
+## Installation
+
+1. Download iTerm from https://iterm2.com/index.html if not installed already.
+1. Clone this repository locally with:
+   ```
+   git clone git@github.com:serenadeai/serenade-iterm.git
+   ```
+1. Add:
+   ```
+   source <path-to-serenade-iterm>/serenade-shell-integration.{bash,zsh}
+   ```
+   to your `~/.{bash,zsh}rc` depending on your preferred shell.
+1. Run `./install.sh` to symlink scripts here to iTerm's Scripts directory.
+1. Restart iTerm, and you should automatically be prompted to install a Python runtime for scripts:
+   <img src="readme/runtime_prompt.png" width=200 />
+   - Alternatively, you can use the menu item under Scripts > Manage > Install Python Runtime.
+
+## Development
+
+1. After installation, use Scripts > Manage > console to restart the script and see output after making changes to files here.
+
+## Supported commands
+
+- Add/change/delete
+- Go to
+- Undo/redo
+
+### Implementation details
 
 #### Shell integration
 
@@ -17,24 +44,3 @@ In `serenade.py`, when the script is launched in iTerm, a new instance of the `C
 - `COMMAND_TYPE_DIFF`, which determines the adjustments to the source and cursor needed, and responds to the client to perform some subset of moving the cursor, deleting a number of characters, and inserting additional characters
 - `COMMAND_TYPE_UNDO`, which uses an internal stack of commands to send an inverse of a previous command to the client via `COMMAND_TYPE_DIFF`00
 - `COMMAND_TYPE_REDO`, which sends previous commands to the client via `COMMAND_TYPE_DIFF`
-
-## Installation
-
-1. Download iTerm from https://iterm2.com/index.html if not installed already.
-1. Clone this repository locally with:
-   `git clone git@github.com:serenadeai/serenade-iterm.git`
-1. Add `source <path-to-serenade-iterm>/serenade-shell-integration.{bash,zsh}` to `.{bash,zsh}rc` depending on your preferred shell.
-1. Run `./install.sh` to symlink scripts here to iTerm's Scripts directory.
-1. Restart iTerm, and you should automatically be prompted to install a Python runtime for scripts:
-   <img src="readme/runtime_prompt.png" width=200 />
-   - Alternatively, you can use the menu item under Scripts > Manage > Install Python Runtime.
-
-## Development
-
-1. After installation, use Scripts > Manage > console to restart the script and see output after making changes to files here.
-
-## Supported commands
-
-- Add/change/delete
-- Go to
-- Undo/redo
