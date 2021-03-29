@@ -15,9 +15,16 @@
 
 If you prefer to not run an installation script directly, you can view it at https://raw.githubusercontent.com/serenadeai/iterm2/main/install.sh and run each line manually.
 
+### Uninstallation
+
+Run the following to uninstall the shell integration and Serenade scripts:
+   ```
+   curl https://raw.githubusercontent.com/serenadeai/iterm2/main/uninstall.sh | bash
+   ```
+
 ## Development
 
-1. After installation, use Scripts > Manage > console to restart the script and see output after making changes to files here.
+1. After installation, use Scripts > Manage > console to restart the script and see output after making changes to files in `~/.serenade/iterm2`.
 
 ## Supported commands
 
