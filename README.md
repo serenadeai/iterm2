@@ -3,25 +3,17 @@
 ## Installation
 
 1. Download iTerm from https://iterm2.com/index.html if not installed already.
-1. Clone this repository locally with:
+1. Run the following to automatically install the shell integration and Serenade scripts:
    ```
-   git clone git@github.com:serenadeai/iterm2.git ~/.serenade/iterm2
+   curl https://raw.githubusercontent.com/serenadeai/iterm2/main/install.sh | bash
    ```
-1. 
-   - For **Bash**, add:
-      ```
-      source ~/.serenade/iterm2/bin/serenade-shell-integration.bash
-      ```
-      to your `~/.bashrc`.
-   - For **ZSH**, add:
-      ```
-      source ~/.serenade/iterm2/bin/serenade-shell-integration.zsh
-      ```
-     to your `~/.zshrc`.
-1. Run `~/.serenade/iterm2/install.sh` to symlink Serenade's scripts to iTerm's Scripts directory.
 1. Restart iTerm, and you should automatically be prompted to install a Python runtime for scripts:
    <img src="readme/runtime_prompt.png" width=200 />
-   - Alternatively, you can use the menu item under Scripts > Manage > Install Python Runtime.
+    - Alternatively, you can use the menu item under Scripts > Manage > Install Python Runtime.
+    
+### Manual installation
+
+If you prefer to not run an installation script directly, you can view it at https://raw.githubusercontent.com/serenadeai/iterm2/main/install.sh and run each line manually.
 
 ## Development
 
