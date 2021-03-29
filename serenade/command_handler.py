@@ -51,25 +51,28 @@ class CommandHandler:
         # For undo commands, manually calculate the adjustments to the cursor, and deletes or inserts
         if command_type == "undo":
             delete_count = len(data.get("insertDiff", ""))
-            cursor_adjustment = (data.get("deleteStart", 0) if delete else data.get("prev_cursor")) \
-                - cursor + delete_count
+            if delete:
+                cursor_adjustment = data.get("deleteStart", 0) - cursor + delete_count
+            else:
+                cursor_adjustment = data.get("prev_cursor") - cursor + delete_count
             text = data.get("deleted", "")
+        # No action is needed for redo commands since the original command is passed in again
         elif command_type == "redo":
             pass
         # Otherwise, append the original command (with additional data about the current state) to the
-        # command stack so we can undo it later.
+        # command stack so we can undo it later
         else:
             data["prev_cursor"] = cursor
             if delete:
-                print("deleting", source, data.get("deleteStart"), data.get("deleteEnd"))
+                # print("Deleting from", source, data.get("deleteStart"), data.get("deleteEnd"))
                 data["deleted"] = source[data.get("deleteStart"):data.get("deleteEnd")]
             self.command_stack = self.command_stack[0:self.undo_index]
             self.command_stack.append(data)
             self.undo_index += 1
 
-        # print(f"Adjusting cursor by {cursor_adjustment}")
-        # print(f"Deleting by {delete_count}")
-        # print(f"Inserting {text}")
+        # print("Adjusting cursor by", cursor_adjustment)
+        # print("Deleting by", delete_count)
+        # print("Inserting", text)
 
         return {
             "message": "applyDiff",
