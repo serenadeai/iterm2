@@ -12,9 +12,11 @@ In `serenade.py`, when the script is launched in iTerm, a new instance of the `C
 
 ##### CommandHandler
 
-`CommandHandler` currently supports two commands:
-- `COMMAND_TYPE_GET_EDITOR_STATE`, which uses the [Prompt](https://iterm2.com/python-api/prompt.html), [Session](https://iterm2.com/python-api/session.html) and [Screen](https://iterm2.com/python-api/screen.html) API to get the source (draft command) and cursor
+`CommandHandler` supports four commands:
+- `COMMAND_TYPE_GET_EDITOR_STATE`, which uses the [Prompt](https://iterm2.com/python-api/prompt.html), [Session](https://iterm2.com/python-api/session.html) and [Screen](https://iterm2.com/python-api/screen.html) API to get the source (drafted command at the prompt) and cursor
 - `COMMAND_TYPE_DIFF`, which determines the adjustments to the source and cursor needed, and responds to the client to perform some subset of moving the cursor, deleting a number of characters, and inserting additional characters
+- `COMMAND_TYPE_UNDO`, which uses an internal stack of commands to send an inverse of a previous command to the client via `COMMAND_TYPE_DIFF`00
+- `COMMAND_TYPE_REDO`, which sends previous commands to the client via `COMMAND_TYPE_DIFF`
 
 ## Installation
 
