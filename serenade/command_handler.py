@@ -78,7 +78,7 @@ class CommandHandler:
                 "deleteCount": delete_count,
                 "text": text,
                 # Tell the client to not automatically press backspace if this is an undo command.
-                "skip_backspace": True,
+                "skipBackspace": True,
             }
         }
 
