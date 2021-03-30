@@ -10,6 +10,7 @@
 1. Restart iTerm, and you should automatically be prompted to install a Python runtime for scripts:
    <img src="readme/runtime_prompt.png" width=200 />
     - Alternatively, you can use the menu item under Scripts > Manage > Install Python Runtime.
+1. You may also need to enable iTerm's [Python API](https://iterm2.com/python-api-auth.html), if it isn't already. You can do this by either starting the Serenade script manually for the first time, via clicking Scripts > serenade > serenade.py, or by enabling the Python API with iTerm2 > Preferences... > General > Magic > Enable Python API. After this, the AutoLaunch script should start the Serenade script every time iTerm is started.
    
 ### Updates
 
