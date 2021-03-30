@@ -13,7 +13,7 @@ elif [[ $SHELL == *"zsh"* ]]; then
   echo "source ~/.serenade/iterm2/bin/serenade-shell-integration.zsh" >> ~/.zshrc
 fi
 
-dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+dir="$HOME/.serenade/iterm2"
 dest="$HOME/Library/Application Support/iTerm2/Scripts"
 
 echo "Adding symlinks to:"
