@@ -10,7 +10,14 @@
 1. Restart iTerm, and you should automatically be prompted to install a Python runtime for scripts:
    <img src="readme/runtime_prompt.png" width=200 />
     - Alternatively, you can use the menu item under Scripts > Manage > Install Python Runtime.
-    
+   
+### Updates
+
+The client app will check and update the plugin each time it's started, but you can manually update with:
+```
+git -C ~/.serenade/iterm2 pull
+```
+ 
 ### Manual installation
 
 If you prefer to not run an installation script directly, you can view it at https://raw.githubusercontent.com/serenadeai/iterm2/main/install.sh and run each line manually.

@@ -94,7 +94,7 @@ class CommandHandler:
         if command_type == "use":
             cursor_adjustment = 0
             delete_count = 0
-        
+
         # print("Adjusting cursor by", cursor_adjustment)
         # print("Deleting by", delete_count)
         # print("Inserting", text)
