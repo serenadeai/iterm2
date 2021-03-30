@@ -56,7 +56,9 @@ class CommandHandler:
         delete = data.get("deleteEnd") is not None and \
             data.get("deleteStart") is not None and \
             data.get("deleteEnd") - data.get("deleteStart") != 0
-        new_cursor = data.get("deleteEnd") if delete else data.get("cursor")
+        new_cursor = data.get("deleteEnd") if delete else \
+            (cursor if text else data.get("cursor"))
+
         delete_count = data.get("deleteEnd", 0) - data.get("deleteStart", 0)
         cursor_adjustment = new_cursor - cursor
 
@@ -81,7 +83,9 @@ class CommandHandler:
             # If it's a use command, push this as the last valid command
             if command_type == "use":
                 # Remember the original command's deleted text
-                data["deleted"] = self.command_stack[self.undo_index - 1]["deleted"]
+                data["deleted"] = self.command_stack[self.undo_index - 1].get("deleted", "")
+                if data["deleted"].endswith("\n"):
+                    data["deleted"] = data["deleted"][:-1]
                 self.command_stack = self.command_stack[0:self.undo_index - 1]
                 self.undo_index -= 1
             # Otherwise, ensure it's the last command in the stack

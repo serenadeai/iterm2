@@ -15,7 +15,7 @@
         - starting the Serenade script manually for the first time, via clicking Scripts > serenade > serenade.py
         - _or_ by enabling the Python API with iTerm2 > Preferences... > General > Magic > Enable Python API
     - After this, the AutoLaunch script should start the Serenade script every time iTerm is started.
-   
+
 ### Updates
 
 The client app will check and update the plugin each time it's started, but you can manually update with:
