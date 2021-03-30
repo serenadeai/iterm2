@@ -9,6 +9,7 @@ class CommandHandler:
         self.connection = connection
         self.undo_index = 0
         self.command_stack = []
+        self.last_command_was_use = False
         pass
 
     async def handle(self, response):
@@ -20,13 +21,24 @@ class CommandHandler:
                 command_type = command.get("type")
 
                 if command_type == "COMMAND_TYPE_DIFF":
-                    result = await self.diff(command)
+                    if self.last_command_was_use:
+                        result = await self.diff(command, "use")
+                        self.last_command_was_use = False
+                    else:
+                        result = await self.diff(command)
                 if command_type == "COMMAND_TYPE_GET_EDITOR_STATE":
                     result = await self.get_editor_state()
                 if command_type == "COMMAND_TYPE_UNDO":
                     result = await self.undo()
+                    self.last_command_was_use = False
                 if command_type == "COMMAND_TYPE_REDO":
                     result = await self.redo()
+                    self.last_command_was_use = False
+                if command_type == "COMMAND_TYPE_USE":
+                    self.last_command_was_use = True
+                    result = {
+                        "message": "completed"
+                    }
 
                 # print(command)
 
@@ -66,10 +78,23 @@ class CommandHandler:
             if delete:
                 # print("Deleting from", source, data.get("deleteStart"), data.get("deleteEnd"))
                 data["deleted"] = source[data.get("deleteStart"):data.get("deleteEnd")]
-            self.command_stack = self.command_stack[0:self.undo_index]
+            # If it's a use command, push this as the last valid command
+            if command_type == "use":
+                # Remember the original command's deleted text
+                data["deleted"] = self.command_stack[self.undo_index - 1]["deleted"]
+                self.command_stack = self.command_stack[0:self.undo_index - 1]
+                self.undo_index -= 1
+            # Otherwise, ensure it's the last command in the stack
+            else:
+                self.command_stack = self.command_stack[0:self.undo_index]
             self.command_stack.append(data)
             self.undo_index += 1
 
+        # Don't delete anything if it's a use command, since the client will do it for us immediately.
+        if command_type == "use":
+            cursor_adjustment = 0
+            delete_count = 0
+        
         # print("Adjusting cursor by", cursor_adjustment)
         # print("Deleting by", delete_count)
         # print("Inserting", text)
@@ -107,6 +132,8 @@ class CommandHandler:
 
     async def get_prompt_and_cursor(self):
         app = await iterm2.async_get_app(self.connection)
+        if app.current_window is None:
+            return "", 0
         session = app.current_window.current_tab.current_session
         prompt = await iterm2.async_get_last_prompt(self.connection, session.session_id)
         if prompt:
@@ -116,6 +143,8 @@ class CommandHandler:
             cursor_coord = screen_contents.cursor_coord
             command = build_command(command_coord, screen_contents, line_info)
             cursor = count_cursor(command_coord, cursor_coord, session.grid_size.width)
+            if cursor > len(command):
+                return command, len(command)
             return command, cursor
         return "", 0
 
