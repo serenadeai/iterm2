@@ -6,7 +6,7 @@ def build_command(command_coord, screen_contents, line_info):
     current_line = command_coord.y - line_info.first_visible_line_number
     # So we go from the first line of the command to the end of the screen, and build the command
     # with the contents of each line.
-    while line_info.first_visible_line_number <= current_line < screen_contents.number_of_lines:
+    while current_line < screen_contents.number_of_lines:
         line = screen_contents.line(current_line).string
         # The first line should be offset by the x-coordinate of the command.
         if current_line == command_coord.y - line_info.first_visible_line_number:
