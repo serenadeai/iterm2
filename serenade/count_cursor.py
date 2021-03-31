@@ -7,7 +7,7 @@ from iterm2 import Point
 def count_cursor(command_coord_start, cursor_coord, screen_width):
     cursor = 0
     current_line = command_coord_start.y
-    while current_line != cursor_coord.y:
+    while current_line < cursor_coord.y:
         if current_line == command_coord_start.y:
             cursor += screen_width - command_coord_start.x
         else:
