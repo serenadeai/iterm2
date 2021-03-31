@@ -1,21 +1,53 @@
+import asyncio
 import iterm2
 
 from build_command import build_command
 from count_cursor import count_cursor
 
+DEBUG = False
+
+
+def log(*args):
+    if DEBUG:
+        print(*args)
+
 
 class CommandHandler:
     def __init__(self, connection):
         self.connection = connection
+        self.command_start_coords = None
+        self.command_running = True
+        self.source = ""
+        self.cursor = 0
         self.undo_index = 0
         self.command_stack = []
         self.last_command_was_use = False
-        pass
+        asyncio.create_task(self.keyboard_listener())
+        asyncio.create_task(self.screen_listener())
+
+    async def keyboard_listener(self):
+        async with iterm2.KeystrokeMonitor(self.connection) as mon:
+            while True:
+                keystroke = await mon.async_get()
+                await self.check_keystroke(keystroke)
+
+    async def screen_listener(self):
+        app = await iterm2.async_get_app(self.connection)
+        session = app.current_window.current_tab.current_session
+        async with session.get_screen_streamer() as streamer:
+            while True:
+                await streamer.async_get()
+                log("Screen output changed", self.command_running)
+                if self.command_running:
+                    log("Setting command start to cursor")
+                    await self.set_coords()
+                else:
+                    await self.get_editor_state()
 
     async def handle(self, response):
         result = None
 
-        # print(response)
+        # log(response)
         if response.get("execute"):
             for command in response.get("execute").get("commandsList"):
                 command_type = command.get("type")
@@ -40,12 +72,15 @@ class CommandHandler:
                         "message": "completed"
                     }
 
-                # print(command)
+                # log(command)
 
         return result
 
     async def diff(self, data, command_type=""):
-        # print("diff", data, command_type)
+        # log("diff", data, command_type)
+        if self.command_running:
+            self.command_running = False
+            await self.set_coords(keypress=False)
 
         source, cursor = await self.get_prompt_and_cursor()
 
@@ -54,8 +89,8 @@ class CommandHandler:
             text = text[:-1]
 
         delete = data.get("deleteEnd") is not None and \
-            data.get("deleteStart") is not None and \
-            data.get("deleteEnd") - data.get("deleteStart") != 0
+                 data.get("deleteStart") is not None and \
+                 data.get("deleteEnd") - data.get("deleteStart") != 0
         new_cursor = data.get("deleteEnd") if delete else \
             (cursor if text else data.get("cursor"))
 
@@ -78,7 +113,7 @@ class CommandHandler:
         else:
             data["prev_cursor"] = cursor
             if delete:
-                # print("Deleting from", source, data.get("deleteStart"), data.get("deleteEnd"))
+                # log("Deleting from", source, data.get("deleteStart"), data.get("deleteEnd"))
                 data["deleted"] = source[data.get("deleteStart"):data.get("deleteEnd")]
             # If it's a use command, push this as the last valid command
             if command_type == "use":
@@ -99,9 +134,9 @@ class CommandHandler:
             cursor_adjustment = 0
             delete_count = 0
 
-        # print("Adjusting cursor by", cursor_adjustment)
-        # print("Deleting by", delete_count)
-        # print("Inserting", text)
+        log("Adjusting cursor by", cursor_adjustment)
+        log("Deleting by", delete_count)
+        log("Inserting", text)
 
         return {
             "message": "applyDiff",
@@ -139,22 +174,21 @@ class CommandHandler:
         if app.current_window is None:
             return "", 0
         session = app.current_window.current_tab.current_session
-        prompt = await iterm2.async_get_last_prompt(self.connection, session.session_id)
-        if prompt:
-            command_coord = prompt.command_range.start
-            screen_contents = await session.async_get_screen_contents()
-            line_info = await session.async_get_line_info()
-            cursor_coord = screen_contents.cursor_coord
-            command = build_command(command_coord, screen_contents, line_info)
-            cursor = count_cursor(command_coord, cursor_coord, session.grid_size.width)
-            if cursor > len(command):
-                return command, len(command)
-            return command, cursor
-        return "", 0
+        screen_contents = await session.async_get_screen_contents()
+        line_info = await session.async_get_line_info()
+        cursor_coord = screen_contents.cursor_coord
+        command_start_coords = self.command_start_coords if self.command_start_coords else cursor_coord
+        command = build_command(command_start_coords, screen_contents, line_info)
+        cursor = count_cursor(command_start_coords, cursor_coord, session.grid_size.width)
+        if cursor > len(command):
+            return command, len(command)
+        return command, cursor
 
     async def get_editor_state(self):
         source, cursor = await self.get_prompt_and_cursor()
-        # print(source, cursor)
+        log("editorState:")
+        log(source)
+        log(cursor)
         return {
             "message": "editorState",
             "data": {
@@ -163,3 +197,46 @@ class CommandHandler:
                 "filename": "iterm.sh",
             }
         }
+
+    async def set_coords(self, keypress=False):
+        app = await iterm2.async_get_app(self.connection)
+        if app.current_window is None:
+            return
+        session = app.current_window.current_tab.current_session
+        screen_contents = await session.async_get_screen_contents()
+        self.command_start_coords = screen_contents.cursor_coord
+        if keypress:
+            self.command_start_coords.x -= 1
+        log("Setting command_start_coords", self.command_start_coords.y, self.command_start_coords.x)
+        source, cursor = await self.get_prompt_and_cursor()
+        log("editorState:")
+        log(source)
+        log(cursor)
+
+    async def clear_state(self):
+        log("RETURN pressed, setting command_running = True")
+        self.command_running = True
+        log("Set self.command_running", self.command_running)
+        source, cursor = await self.get_prompt_and_cursor()
+        log("previous editorState:", source, cursor)
+        await self.set_coords()
+        pass
+
+    async def start_command(self):
+        # If command is running, then we know we are just starting a new command,
+        # so use the current cursor to mark where the command should start
+        if self.command_running:
+            log("Other key pressed, marking command start at cursor")
+            self.command_running = False
+            await self.set_coords(keypress=True)
+
+    async def check_keystroke(self, keystroke):
+        if keystroke.keycode == iterm2.keyboard.Keycode.RETURN or \
+            (
+                iterm2.keyboard.Modifier.CONTROL in keystroke.modifiers and
+                (keystroke.keycode == iterm2.keyboard.Keycode.ANSI_C or
+                 keystroke.keycode == iterm2.keyboard.Keycode.ANSI_D)
+                    ):
+            await self.clear_state()
+        else:
+            await self.start_command()
