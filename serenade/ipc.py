@@ -9,10 +9,10 @@ class Ipc:
         self.command_handler = command_handler
         self.websocket = None
 
-        app = "iterm"
+        self.app = "iterm"
         self.plugin_id = str(uuid.uuid4())
         self.active_message = {
-            "app": app,
+            "app": self.app,
             "id": self.plugin_id
         }
         self.url = "ws://localhost:17373/"
@@ -21,6 +21,12 @@ class Ipc:
 
     async def retry_connection(self):
         while True:
+            # Reset the active/heartbeat message with a new UUID
+            self.plugin_id = str(uuid.uuid4())
+            self.active_message = {
+                "app": self.app,
+                "id": self.plugin_id
+            }
             try:
                 await self.connect()
             except (OSError, websockets.exceptions.ConnectionClosedError):
@@ -35,7 +41,7 @@ class Ipc:
             print(f"Connected {websocket}")
 
             await self.send("active", self.active_message)
-            print("Sent active")
+            print("Sent active message", self.active_message)
 
             await self.message_handler()
 
@@ -47,7 +53,7 @@ class Ipc:
     async def send(self, message, data):
         if self.websocket:
             # print("Sending raw message:")
-            # print(message)
+            # print(message, data)
             await self.websocket.send(json.dumps({
                 "message": message,
                 "data": data

@@ -22,8 +22,6 @@ class CommandHandler:
         self.undo_index = 0
         self.command_stack = []
         self.last_command_was_use = False
-        asyncio.create_task(self.keyboard_listener())
-        asyncio.create_task(self.screen_listener())
 
     async def keyboard_listener(self):
         async with iterm2.KeystrokeMonitor(self.connection) as mon:
@@ -36,7 +34,7 @@ class CommandHandler:
         session = app.current_window.current_tab.current_session
         async with session.get_screen_streamer() as streamer:
             while True:
-                await streamer.async_get()
+                contents = await streamer.async_get()
                 log("Screen output changed", self.command_running)
                 if self.command_running:
                     log("Setting command start to cursor")
