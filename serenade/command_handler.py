@@ -38,18 +38,15 @@ class CommandHandler:
                 await self.check_keystroke(keystroke)
 
     async def screen_listener(self):
-        while True:
-            async with self.session.get_screen_streamer() as streamer:
-                while True:
-                    await streamer.async_get()
-                    log("Screen output changed, update_on_render is", self.update_on_render)
-                    if self.update_on_render:
-                        await self.update_prompt()
-                    else:
-                        source, cursor = await self.get_prompt_and_cursor()
-                        log(f"editorState: '{source}', {cursor}")
-            await asyncio.sleep(1)
-            log("retrying")
+        async with self.session.get_screen_streamer() as streamer:
+            while True:
+                await streamer.async_get()
+                log("Screen output changed, update_on_render is", self.update_on_render)
+                if self.update_on_render:
+                    await self.update_prompt()
+                else:
+                    source, cursor = await self.get_prompt_and_cursor()
+                    log(f"editorState: '{source}', {cursor}")
 
     async def handle(self, response):
         result = None
