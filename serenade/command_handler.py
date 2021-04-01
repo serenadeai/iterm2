@@ -17,8 +17,6 @@ class CommandHandler:
         self.connection = connection
         self.command_start_coords = None
         self.command_running = True
-        self.source = ""
-        self.cursor = 0
         self.undo_index = 0
         self.command_stack = []
         self.last_command_was_use = False
@@ -212,11 +210,10 @@ class CommandHandler:
         log(cursor)
 
     async def clear_state(self):
-        log("RETURN pressed, setting command_running = True")
+        log("Clearing state, setting command_running = True")
         self.command_running = True
-        log("Set self.command_running", self.command_running)
         source, cursor = await self.get_prompt_and_cursor()
-        log("previous editorState:", source, cursor)
+        log("Previous editorState:", source, cursor)
         await self.set_coords()
         pass
 
@@ -229,6 +226,7 @@ class CommandHandler:
             await self.set_coords(keypress=True)
 
     async def check_keystroke(self, keystroke):
+        # For enter, control+C, and control+D, clear the state so we can update the cursor
         if keystroke.keycode == iterm2.keyboard.Keycode.RETURN or \
             (
                 iterm2.keyboard.Modifier.CONTROL in keystroke.modifiers and
@@ -236,5 +234,10 @@ class CommandHandler:
                  keystroke.keycode == iterm2.keyboard.Keycode.ANSI_D)
                     ):
             await self.clear_state()
+        # For up, mark the state as not running a command, but don't update cursor
+        elif keystroke.keycode == iterm2.keyboard.Keycode.UP_ARROW:
+            if self.command_running:
+                self.command_running = False
+        # Otherwise, mark the cursor
         else:
             await self.start_command()
