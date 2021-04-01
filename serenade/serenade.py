@@ -12,7 +12,8 @@ async def main(connection):
 
     async def start_tasks(session_id):
         while True:
-            command_handler = CommandHandler(connection, session_id)
+            session = app.get_session_by_id(session_id)
+            command_handler = CommandHandler(connection, session_id, session)
             ipc = Ipc(command_handler)
             ipc_task = asyncio.create_task(ipc.retry_connection())
             keyboard_listener_task = asyncio.create_task(command_handler.keyboard_listener())

@@ -12,9 +12,10 @@ def log(*args):
 
 
 class CommandHandler:
-    def __init__(self, connection, session_id):
+    def __init__(self, connection, session_id, session):
         self.connection = connection
         self.session_id = session_id
+        self.session = session
 
         # Editor state
         self.command_start_coords = None
@@ -31,29 +32,22 @@ class CommandHandler:
         self.last_command_was_use = False
 
     async def keyboard_listener(self):
-        app = await iterm2.async_get_app(self.connection)
-        async with iterm2.KeystrokeMonitor(self.connection) as mon:
+        async with iterm2.KeystrokeMonitor(self.connection, self.session_id) as mon:
             while True:
                 keystroke = await mon.async_get()
-                session = app.get_session_by_id(self.session_id)
-                if session and session.window is app.current_window:
-                    await self.check_keystroke(keystroke)
+                await self.check_keystroke(keystroke)
 
     async def screen_listener(self):
-        app = await iterm2.async_get_app(self.connection)
         while True:
-            if app.current_window:
-                session = app.current_window.current_tab.current_session
-                log(session)
-                async with session.get_screen_streamer() as streamer:
-                    while True:
-                        await streamer.async_get()
-                        log("Screen output changed, update_on_render is", self.update_on_render)
-                        if self.update_on_render:
-                            await self.update_prompt()
-                        else:
-                            source, cursor = await self.get_prompt_and_cursor()
-                            log(f"editorState: '{source}', {cursor}")
+            async with self.session.get_screen_streamer() as streamer:
+                while True:
+                    await streamer.async_get()
+                    log("Screen output changed, update_on_render is", self.update_on_render)
+                    if self.update_on_render:
+                        await self.update_prompt()
+                    else:
+                        source, cursor = await self.get_prompt_and_cursor()
+                        log(f"editorState: '{source}', {cursor}")
             await asyncio.sleep(1)
             log("retrying")
 
@@ -179,11 +173,9 @@ class CommandHandler:
         return result
 
     async def get_prompt_and_cursor(self):
-        app = await iterm2.async_get_app(self.connection)
-        session = app.current_window.current_tab.current_session
         i, screen_contents = await self.get_active_line_number()
         source = (await self.get_active_line())[self.prompt.get("offset_left"):]
-        cursor = session.grid_size.width * (i - self.prompt.get("buffer_index")) + \
+        cursor = self.session.grid_size.width * (i - self.prompt.get("buffer_index")) + \
             screen_contents.cursor_coord.x - self.prompt.get("offset_left")
         if len(source) < cursor:
             source += " " * (cursor - len(source))
@@ -218,9 +210,7 @@ class CommandHandler:
         return line
 
     async def get_active_line_number(self):
-        app = await iterm2.async_get_app(self.connection)
-        session = app.current_window.current_tab.current_session
-        screen_contents = await session.async_get_screen_contents()
+        screen_contents = await self.session.async_get_screen_contents()
         for i in range(screen_contents.number_of_lines - 1, -1, -1):
             if not screen_contents.line(i).hard_eol or \
                     self.empty_line_regex.search(screen_contents.line(i).string) is None:
