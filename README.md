@@ -2,7 +2,7 @@
 
 ## Installation
 
-1. Download and install iTerm2 from https://iterm2.com.html if not installed already.
+1. Download and install iTerm2 from https://iterm2.com if not installed already.
 1. Run the below to install the Serenade plugin:
    ```
    curl https://raw.githubusercontent.com/serenadeai/iterm2/main/install.sh | bash
@@ -40,7 +40,7 @@ Run the following to uninstall the shell integration and Serenade scripts:
 
 #### Layout
 
-In `serenade.py`, when the script is launched in iTerm, a new instance of the `CommandHandler` class is created, along with the `Ipc` class needed to communicate with the client. iTerm provides a single global [Connection](https://iterm2.com/python-api/connection.html) API through which all requests with the terminal is made.
+In `serenade.py`, when the script is launched in iTerm, for every new session a new instance of the `CommandHandler` class is created, along with the `Ipc` class needed to communicate with the client. iTerm provides a single global [Connection](https://iterm2.com/python-api/connection.html) API through which all requests with the terminal is made.
 
 ##### CommandHandler
 

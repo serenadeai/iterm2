@@ -29,12 +29,12 @@ class CommandHandler:
     async def screen_listener(self):
         async with self.session.get_screen_streamer() as streamer:
             while True:
-                await streamer.async_get()
+                screen_contents = await streamer.async_get()
                 log("Screen output changed, update_on_render is", self.update_on_render)
                 if self.update_on_render:
-                    await self.update_prompt()
-                else:
-                    source, cursor = await self.get_prompt_and_cursor()
+                    await self.update_prompt(screen_contents=screen_contents)
+                elif DEBUG:
+                    source, cursor = await self.get_prompt_and_cursor(screen_contents=screen_contents)
                     log(f"editorState: '{source}', {cursor}")
 
     async def check_keystroke(self, keystroke):
@@ -82,9 +82,10 @@ class CommandHandler:
             },
         }
 
-    async def get_prompt_and_cursor(self):
-        screen_contents = await self.session.async_get_screen_contents()
-        source, line_count = await self.get_source()
+    async def get_prompt_and_cursor(self, screen_contents=None):
+        if screen_contents is None:
+            screen_contents = await self.session.async_get_screen_contents()
+        source, line_count = await self.get_source(screen_contents=screen_contents)
         # If the cursor is on the first character of the next line, that counts as a line
         line_count = max(
             screen_contents.cursor_coord.y - self.command_start_coords.y + 1, line_count
@@ -98,8 +99,9 @@ class CommandHandler:
             source += " " * (cursor - len(source))
         return source, cursor
 
-    async def update_prompt(self):
-        screen_contents = await self.session.async_get_screen_contents()
+    async def update_prompt(self, screen_contents=None):
+        if screen_contents is None:
+            screen_contents = await self.session.async_get_screen_contents()
         # When the screen is cleared, then we only want to update the row, since
         # there might be text in the prompt already
         if self.clear_screen_pressed:
@@ -108,9 +110,10 @@ class CommandHandler:
         else:
             self.command_start_coords = screen_contents.cursor_coord
 
-    async def get_source(self):
+    async def get_source(self, screen_contents=None):
         command = ""
-        screen_contents = await self.session.async_get_screen_contents()
+        if screen_contents is None:
+            screen_contents = await self.session.async_get_screen_contents()
         line_info = await self.session.async_get_line_info()
         command_start_line = (
             self.command_start_coords.y - line_info.first_visible_line_number

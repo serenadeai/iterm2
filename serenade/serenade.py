@@ -10,7 +10,7 @@ from ipc import Ipc
 async def main(connection):
     app = await iterm2.async_get_app(connection)
 
-    async def start_tasks(session_id):
+    async def start_session_tasks(session_id):
         while True:
             session = app.get_session_by_id(session_id)
             command_handler = CommandHandler(connection, session_id, session)
@@ -31,7 +31,7 @@ async def main(connection):
                     t.cancel()
                 await asyncio.sleep(1)
 
-    await (iterm2.EachSessionOnceMonitor.async_foreach_session_create_task(app, start_tasks))
+    await (iterm2.EachSessionOnceMonitor.async_foreach_session_create_task(app, start_session_tasks))
 
 
 # This instructs the script to run the "main" coroutine and to keep running even after it returns.
