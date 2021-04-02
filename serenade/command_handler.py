@@ -1,6 +1,4 @@
-import asyncio
 import iterm2
-import re
 
 
 DEBUG = False
@@ -8,7 +6,7 @@ DEBUG = False
 
 def log(*args):
     if DEBUG:
-        print(*args)
+        print("CoH:", *args)
 
 
 class CommandHandler:
@@ -125,11 +123,12 @@ class CommandHandler:
             # If it's a use command, push this as the last valid command
             if command_type == "use":
                 # Remember the original command's deleted text
-                data["deleted"] = self.command_stack[self.undo_index - 1].get("deleted", "")
-                if data["deleted"].endswith("\n"):
-                    data["deleted"] = data["deleted"][:-1]
-                self.command_stack = self.command_stack[0:self.undo_index - 1]
-                self.undo_index -= 1
+                if len(self.command_stack) > 1:
+                    data["deleted"] = self.command_stack[self.undo_index - 1].get("deleted", "")
+                    if data["deleted"].endswith("\n"):
+                        data["deleted"] = data["deleted"][:-1]
+                    self.command_stack = self.command_stack[0:self.undo_index - 1]
+                    self.undo_index -= 1
             # Otherwise, ensure it's the last command in the stack
             else:
                 self.command_stack = self.command_stack[0:self.undo_index]

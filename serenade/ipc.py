@@ -1,7 +1,16 @@
 import asyncio
+import iterm2
 import json
 import uuid
 import websockets
+
+
+DEBUG = False
+
+
+def log(*args):
+    if DEBUG:
+        print("IPC:", *args)
 
 
 class Ipc:
@@ -31,17 +40,25 @@ class Ipc:
                 await self.connect()
             except (OSError, websockets.exceptions.ConnectionClosedError):
                 self.websocket = None
-                # print("Could not connect")
+                log("Could not connect")
                 await asyncio.sleep(1)
-                # print ("Retrying ...")
+                log("Retrying ...")
+
+    async def focus_listener(self, connection, session_id):
+        async with iterm2.FocusMonitor(connection) as mon:
+            while True:
+                update = await mon.async_get_next_update()
+                if update.active_session_changed and update.active_session_changed.session_id == session_id:
+                    await self.send("active", self.active_message)
+                    log("Sent active message", self.active_message)
 
     async def connect(self):
         async with websockets.connect(self.url) as websocket:
             self.websocket = websocket
-            print(f"Connected {websocket}")
+            log("Connected, websocket")
 
             await self.send("active", self.active_message)
-            print("Sent active message", self.active_message)
+            log("Sent active message", self.active_message)
 
             await self.message_handler()
 
@@ -52,8 +69,8 @@ class Ipc:
 
     async def send(self, message, data):
         if self.websocket:
-            # print("Sending raw message:")
-            # print(message, data)
+            log("Sending raw message:")
+            log(message, data)
             await self.websocket.send(json.dumps({
                 "message": message,
                 "data": data
@@ -75,5 +92,5 @@ class Ipc:
                 "callback": callback,
                 "data": result
             })
-            # print("Received raw message:")
-            # print(message)
+            log("Received raw message:")
+            log(message)

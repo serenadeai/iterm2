@@ -18,10 +18,11 @@ async def main(connection):
             ipc_task = asyncio.create_task(ipc.retry_connection())
             keyboard_listener_task = asyncio.create_task(command_handler.keyboard_listener())
             screen_listener_task = asyncio.create_task(command_handler.screen_listener())
+            focus_listener_task = asyncio.create_task(ipc.focus_listener(connection, session_id))
             update_prompt_task = asyncio.create_task(command_handler.update_prompt())
-            tasks = [ipc_task, keyboard_listener_task, screen_listener_task, update_prompt_task]
+            tasks = [ipc_task, keyboard_listener_task, screen_listener_task, update_prompt_task, focus_listener_task]
             try:
-                print("Starting tasks")
+                print("***", "Starting tasks for session", session_id)
                 await asyncio.gather(*tasks)
             except Exception as e:
                 print("Exception:", e)
