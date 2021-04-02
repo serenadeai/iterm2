@@ -19,12 +19,8 @@ class CommandHandler:
 
         # Editor state
         self.command_start_coords = None
-        self.empty_line_regex = re.compile(r"^\s*$")
+        self.clear_screen_pressed = False
         self.update_on_render = True
-        self.prompt = {
-            "offset_left": 0,
-            "buffer_index": 0
-        }
 
         # Undo stack
         self.undo_index = 0
@@ -47,6 +43,17 @@ class CommandHandler:
                 else:
                     source, cursor = await self.get_prompt_and_cursor()
                     log(f"editorState: '{source}', {cursor}")
+
+    async def check_keystroke(self, keystroke):
+        # For enter and keys with modifiers, clear the state so we can update the cursor
+        if keystroke.keycode == iterm2.keyboard.Keycode.RETURN or len(keystroke.modifiers):
+            # Clearing the screen with control+L doesn't remove the command
+            if iterm2.keyboard.Modifier.CONTROL in keystroke.modifiers and\
+                    keystroke.keycode == iterm2.keyboard.Keycode.ANSI_L:
+                self.clear_screen_pressed = True
+            self.update_on_render = True
+        else:
+            self.update_on_render = False
 
     async def handle(self, response):
         result = None
@@ -169,15 +176,6 @@ class CommandHandler:
         result = await self.diff(redo_command, "redo")
         return result
 
-    async def get_prompt_and_cursor(self):
-        i, screen_contents = await self.get_active_line_number()
-        source = (await self.get_active_line())[self.prompt.get("offset_left"):]
-        cursor = self.session.grid_size.width * (i - self.prompt.get("buffer_index")) + \
-            screen_contents.cursor_coord.x - self.prompt.get("offset_left")
-        if len(source) < cursor:
-            source += " " * (cursor - len(source))
-        return source, cursor
-
     async def get_editor_state(self):
         source, cursor = await self.get_prompt_and_cursor()
         log(f"editorState: '{source}', {cursor}")
@@ -190,39 +188,46 @@ class CommandHandler:
             }
         }
 
-    async def update_prompt(self):
-        buffer_index, screen_contents = await self.get_active_line_number()
-        log("Prompt updated to", buffer_index, screen_contents.cursor_coord.x)
-        self.prompt = {
-            "offset_left": screen_contents.cursor_coord.x,
-            "buffer_index": buffer_index
-        }
-
-    async def get_active_line(self):
-        i, screen_contents = await self.get_active_line_number()
-        line = screen_contents.line(i).string.rstrip()
-        while i > 0 and i != self.prompt.get("buffer_index"):
-            line = screen_contents.line(i - 1).string + line
-            i -= 1
-        return line
-
-    async def get_active_line_number(self):
+    async def get_prompt_and_cursor(self):
         screen_contents = await self.session.async_get_screen_contents()
-        for i in range(screen_contents.number_of_lines - 1, -1, -1):
-            if not screen_contents.line(i).hard_eol or \
-                    self.empty_line_regex.search(screen_contents.line(i).string) is None:
-                return i, screen_contents
-        return 0, screen_contents
+        source, line_count = await self.get_source()
+        # If the cursor is on the first character of the next line, that counts as a line
+        line_count = max(screen_contents.cursor_coord.y - self.command_start_coords.y + 1, line_count)
+        cursor = screen_contents.cursor_coord.x - self.command_start_coords.x + \
+            self.session.grid_size.width * (line_count - 1)
+        if len(source) < cursor:
+            source += " " * (cursor - len(source))
+        return source, cursor
 
-    async def check_keystroke(self, keystroke):
-        # For enter, control+C, and control+D, clear the state so we can update the cursor
-        if keystroke.keycode == iterm2.keyboard.Keycode.RETURN or \
-            (
-                iterm2.keyboard.Modifier.CONTROL in keystroke.modifiers and
-                (keystroke.keycode == iterm2.keyboard.Keycode.ANSI_C or
-                 keystroke.keycode == iterm2.keyboard.Keycode.ANSI_D)
-                    ):
-            self.update_on_render = True
+    async def update_prompt(self):
+        screen_contents = await self.session.async_get_screen_contents()
+        # When the screen is cleared, then we only want to update the row, since
+        # there might be text in the prompt already
+        if self.clear_screen_pressed:
+            self.command_start_coords.y = screen_contents.cursor_coord.y
+            self.clear_screen_pressed = False
         else:
-            self.update_on_render = False
+            self.command_start_coords = screen_contents.cursor_coord
 
+    async def get_source(self):
+        command = ""
+        screen_contents = await self.session.async_get_screen_contents()
+        line_info = await self.session.async_get_line_info()
+        command_start_line = self.command_start_coords.y - line_info.first_visible_line_number
+
+        i = command_start_line
+        while i < screen_contents.number_of_lines:
+            line = screen_contents.line(i).string
+            # We stop after the first empty line
+            if len(line.rstrip()) == 0:
+                break
+            # The first line should be offset by the x-coordinate of the command.
+            if i == command_start_line:
+                command += line[self.command_start_coords.x:]
+            # The last line should have whitespace trimmed with no newlines
+            elif i == screen_contents.number_of_lines - 1:
+                command += line.rstrip()
+            else:
+                command += line
+            i += 1
+        return command.rstrip(), i - command_start_line
