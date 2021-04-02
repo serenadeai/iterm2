@@ -18,6 +18,7 @@ class CommandHandler:
         # Editor state
         self.command_start_coords = None
         self.clear_screen_pressed = False
+        self.last_line = None
         self.update_on_render = True
 
     async def keyboard_listener(self):
@@ -30,8 +31,27 @@ class CommandHandler:
         async with self.session.get_screen_streamer() as streamer:
             while True:
                 screen_contents = await streamer.async_get()
+                line_info = await self.session.async_get_line_info()
+                line_changed = False
+
+                # We're on a different line than before
+                if self.command_start_coords and self.command_start_coords.y != screen_contents.cursor_coord.y:
+                    line_changed = True
+                    # Unless the new line is from a wrapped line, so try to look up 2 lines and see if it's the same
+                    current_line = (
+                        screen_contents.cursor_coord.y - line_info.first_visible_line_number
+                    )
+                    if current_line > 2 and screen_contents.line(current_line - 2).string == self.last_line:
+                        line_changed = False
+                    # Otherwise update the last line if we can
+                    elif screen_contents.number_of_lines > current_line > 1:
+                        self.last_line = screen_contents.line(current_line - 1).string
+
                 log("Screen output changed, update_on_render is", self.update_on_render)
                 if self.update_on_render:
+                    await self.update_prompt(screen_contents=screen_contents)
+                elif line_changed:
+                    log("Updating prompt since line_changed")
                     await self.update_prompt(screen_contents=screen_contents)
                 elif DEBUG:
                     source, cursor = await self.get_prompt_and_cursor(screen_contents=screen_contents)
@@ -49,6 +69,7 @@ class CommandHandler:
             ):
                 self.clear_screen_pressed = True
             self.update_on_render = True
+            self.last_line = None
         else:
             self.update_on_render = False
 
@@ -111,7 +132,6 @@ class CommandHandler:
             self.command_start_coords = screen_contents.cursor_coord
 
     async def get_source(self, screen_contents=None):
-        command = ""
         if screen_contents is None:
             screen_contents = await self.session.async_get_screen_contents()
         line_info = await self.session.async_get_line_info()
@@ -119,6 +139,7 @@ class CommandHandler:
             self.command_start_coords.y - line_info.first_visible_line_number
         )
 
+        command = ""
         i = command_start_line
         while i < screen_contents.number_of_lines:
             line = screen_contents.line(i).string
