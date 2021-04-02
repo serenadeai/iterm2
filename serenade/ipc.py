@@ -17,25 +17,17 @@ class Ipc:
     def __init__(self, command_handler):
         self.command_handler = command_handler
         self.websocket = None
-
         self.app = "iterm"
         self.plugin_id = str(uuid.uuid4())
-        self.active_message = {
-            "app": self.app,
-            "id": self.plugin_id
-        }
+        self.active_message = {"app": self.app, "id": self.plugin_id}
         self.url = "ws://localhost:17373/"
-
         self.heartbeat_task = asyncio.create_task(self.heartbeat())
 
     async def retry_connection(self):
         while True:
             # Reset the active/heartbeat message with a new UUID
             self.plugin_id = str(uuid.uuid4())
-            self.active_message = {
-                "app": self.app,
-                "id": self.plugin_id
-            }
+            self.active_message = {"app": self.app, "id": self.plugin_id}
             try:
                 await self.connect()
             except (OSError, websockets.exceptions.ConnectionClosedError):
@@ -71,10 +63,8 @@ class Ipc:
         if self.websocket:
             log("Sending raw message:")
             log(message, data)
-            await self.websocket.send(json.dumps({
-                "message": message,
-                "data": data
-            }))
+            await self.websocket.send(json.dumps({"message": message, "data": data}))
+
 
     async def message_handler(self):
         async for message in self.websocket:
@@ -87,10 +77,6 @@ class Ipc:
 
             callback = data.get("callback")
             result = await self.command_handler.handle(data.get("response"))
-
-            await self.send("callback", {
-                "callback": callback,
-                "data": result
-            })
+            await self.send("callback", {"callback": callback, "data": result})
             log("Received raw message:")
             log(message)

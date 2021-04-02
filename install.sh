@@ -5,21 +5,13 @@ set -e
 echo "Cloning git@github.com:serenadeai/iterm2.git to ~/.serenade/iterm2"
 git clone git@github.com:serenadeai/iterm2.git ~/.serenade/iterm2
 
-if [[ $SHELL == *"bash"* ]]; then
-  echo "Adding ~/.serenade/iterm2/bin/serenade-shell-integration.bash to ~/.bash_profile"
-  echo "source ~/.serenade/iterm2/bin/serenade-shell-integration.bash" >> ~/.bash_profile
-elif [[ $SHELL == *"zsh"* ]]; then
-  echo "Adding ~/.serenade/iterm2/bin/serenade-shell-integration.zsh to ~/.zshrc"
-  echo "source ~/.serenade/iterm2/bin/serenade-shell-integration.zsh" >> ~/.zshrc
-fi
-
-dir="$HOME/.serenade/iterm2"
-dest="$HOME/Library/Application Support/iTerm2/Scripts"
+directory="$HOME/.serenade/iterm2"
+destination="$HOME/Library/Application Support/iTerm2/Scripts"
 
 echo "Adding symlinks to:"
-echo "$dest"
+echo "$destination"
 echo
-(set -x; mkdir -p "$dest")
-(set -x; ln -s "$dir"/serenade "$dest")
-(set -x; ln -s "$dir"/AutoLaunch.scpt "$dest")
+(set -x; mkdir -p "$destination")
+(set -x; ln -s "$directory"/serenade "$destination")
+(set -x; ln -s "$directory"/AutoLaunch.scpt "$destination")
 echo "Done!"
