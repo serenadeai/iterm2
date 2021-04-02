@@ -65,7 +65,6 @@ class Ipc:
             log(message, data)
             await self.websocket.send(json.dumps({"message": message, "data": data}))
 
-
     async def message_handler(self):
         async for message in self.websocket:
             try:

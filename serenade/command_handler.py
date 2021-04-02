@@ -59,10 +59,18 @@ class CommandHandler:
             for command in response.get("execute").get("commandsList"):
                 command_type = command.get("type")
                 if command_type == "COMMAND_TYPE_GET_EDITOR_STATE":
-                    result = await self.get_editor_state()
+                    result = await self.get_editor_state(limited=command.get("limited"))
         return result
 
-    async def get_editor_state(self):
+    async def get_editor_state(self, limited):
+        if limited:
+            return {
+                "message": "editorState",
+                "data": {
+                    "filename": "iterm.sh",
+                },
+            }
+
         source, cursor = await self.get_prompt_and_cursor()
         log(f"editorState: '{source}', {cursor}")
         return {
