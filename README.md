@@ -47,3 +47,19 @@ In `serenade.py`, when the script is launched in iTerm, for every new session a 
 `CommandHandler` supports these commands:
 
 - `COMMAND_TYPE_GET_EDITOR_STATE`, which uses the [Prompt](https://iterm2.com/python-api/prompt.html), [Session](https://iterm2.com/python-api/session.html) and [Screen](https://iterm2.com/python-api/screen.html) API to get the source (drafted command at the prompt) and cursor
+
+Changes that are tested for editor state correctness:
+- A new shell session (window, tab, or pane) is created
+- A command is executed successfully
+- A command is cancelled with control+C
+- A new shell session is created via SSH
+- A shell session is ended with control+D
+- The screen is cleared with control+K
+- A long command wraps to the next line
+- A REPL such as `python` or `node is started or exited
+- Commands are executed within a REPL
+- A "full-screen app" such as `vim`, `less`, or `htop` is started and exited
+
+Known bugs:
+- Lines that wrap after the session is resized will have inaccurate cursor counts
+- A `^@` control code appears in the string returned by the iTerm API when control+L is pressed after there is a space in the command, which causes the source and cursor to be inaccurate

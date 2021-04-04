@@ -41,7 +41,7 @@ class CommandHandler:
                     current_line = (
                         screen_contents.cursor_coord.y - line_info.first_visible_line_number
                     )
-                    if current_line > 2 and screen_contents.line(current_line - 2).string == self.last_line:
+                    if screen_contents.number_of_lines > current_line > 2 and screen_contents.line(current_line - 2).string == self.last_line:
                         line_changed = False
                     # Otherwise update the last line if we can
                     elif screen_contents.number_of_lines > current_line > 1:
@@ -58,16 +58,20 @@ class CommandHandler:
                     log(f"editorState: '{source}', {cursor}")
 
     async def check_keystroke(self, keystroke):
-        # For enter and keys with modifiers, clear the state so we can update the cursor
-        if keystroke.keycode == iterm2.keyboard.Keycode.RETURN or len(
-            keystroke.modifiers
+        # Clearing the screen with control+L doesn't remove the command
+        if (
+            iterm2.keyboard.Modifier.CONTROL in keystroke.modifiers
+            and keystroke.keycode == iterm2.keyboard.Keycode.ANSI_L
         ):
-            # Clearing the screen with control+L doesn't remove the command
-            if (
-                iterm2.keyboard.Modifier.CONTROL in keystroke.modifiers
-                and keystroke.keycode == iterm2.keyboard.Keycode.ANSI_L
-            ):
-                self.clear_screen_pressed = True
+            self.clear_screen_pressed = True
+            self.update_on_render = True
+            self.last_line = None
+        # For enter, control+C, and control+D, clear the state so we can update the cursor
+        elif keystroke.keycode == iterm2.keyboard.Keycode.RETURN or (
+            iterm2.keyboard.Modifier.CONTROL in keystroke.modifiers
+            and (keystroke.keycode == iterm2.keyboard.Keycode.ANSI_C or
+                 keystroke.keycode == iterm2.keyboard.Keycode.ANSI_D)
+        ):
             self.update_on_render = True
             self.last_line = None
         else:
@@ -111,6 +115,8 @@ class CommandHandler:
         line_count = max(
             screen_contents.cursor_coord.y - self.command_start_coords.y + 1, line_count
         )
+        # BUG: self.session.grid_size.width does not seem to update when the session
+        # is resized, so the calculation here becomes incorrect
         cursor = (
             screen_contents.cursor_coord.x
             - self.command_start_coords.x
