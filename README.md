@@ -56,7 +56,7 @@ Changes that are tested for editor state correctness:
 - A shell session is ended with control+D
 - The screen is cleared with control+K
 - A long command wraps to the next line
-- A REPL such as `python` or `node is started or exited
+- A REPL such as `python` or `node` is started or exited
 - Commands are executed within a REPL
 - A "full-screen app" such as `vim`, `less`, or `htop` is started and exited
 
