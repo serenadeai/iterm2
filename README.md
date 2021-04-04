@@ -2,27 +2,26 @@
 
 ## Installation
 
-1. Download iTerm from https://iterm2.com/index.html if not installed already.
-1. Run the following to automatically install the shell integration and Serenade scripts:
+1. Download and install iTerm2 from https://iterm2.com if not installed already.
+1. Run the below to install the Serenade plugin:
    ```
    curl https://raw.githubusercontent.com/serenadeai/iterm2/main/install.sh | bash
    ```
-1. Restart iTerm, and you should automatically be prompted to install a Python runtime for scripts:
+1. Restart iTerm2, and you should automatically be prompted to install a Python runtime for scripts:
     <img src="readme/runtime_prompt.png" width=200 />
-    - Alternatively, you can use the menu item under Scripts > Manage > Install Python Runtime.
-1. You may also need to enable iTerm's [Python API](https://iterm2.com/python-api-auth.html), if it isn't already.
-    - You can do this by either:
-        - starting the Serenade script manually for the first time, via clicking Scripts > serenade > serenade.py
-        - _or_ by enabling the Python API with iTerm2 > Preferences... > General > Magic > Enable Python API
-    - After this, the AutoLaunch script should start the Serenade script every time iTerm is started.
+    - If not, you can install by Python runtime manually via the menu item under Scripts > Manage > Install Python Runtime.
+1. Enable iTerm2's [Python API](https://iterm2.com/python-api-auth.html). You can do this by either:
+    - starting the Serenade script manually for the first time, via clicking Scripts > serenade > serenade.py
+    - _or_ by enabling the Python API with iTerm2 > Preferences... > General > Magic > Enable Python API
+
+Now, the AutoLaunch script should start the Serenade script every time iTerm2 is started.
 
 ### Updates
 
 The client app will check and update the plugin each time it's started, but you can manually update with:
-```
-git -C ~/.serenade/iterm2 pull
-```
- 
+
+    git -C ~/.serenade/iterm2 pull
+
 ### Manual installation
 
 If you prefer to not run an installation script directly, you can view it at https://raw.githubusercontent.com/serenadeai/iterm2/main/install.sh and run each line manually.
@@ -30,34 +29,37 @@ If you prefer to not run an installation script directly, you can view it at htt
 ### Uninstallation
 
 Run the following to uninstall the shell integration and Serenade scripts:
-   ```
+
    curl https://raw.githubusercontent.com/serenadeai/iterm2/main/uninstall.sh | bash
-   ```
 
 ## Development
 
 1. After installation, use Scripts > Manage > console to restart the script and see output after making changes to files in `~/.serenade/iterm2`.
 
-## Supported commands
-
-- Add/change/delete
-- Go to
-- Undo/redo
-
 ### Implementation details
-
-#### Shell integration
-
-In the `bin` directory of [serenade-hyper](https://github.com/serenadeai/serenade-hyper/tree/main/bin), shell scripts based on [iTerm2's shell integration](https://iterm2.com/documentation-shell-integration.html) tells the shell to send additional escape codes that indicate the start and end of the prompt and output. This is automatically handled by iTerm to determine the prompt's contents and position on screen.
 
 #### Layout
 
-In `serenade.py`, when the script is launched in iTerm, a new instance of the `CommandHandler` class is created, along with the `Ipc` class needed to communicate with the client. iTerm provides a single global [Connection](https://iterm2.com/python-api/connection.html) API through which all requests with the terminal is made.
+In `serenade.py`, when the script is launched in iTerm, for every new session a new instance of the `CommandHandler` class is created, along with the `Ipc` class needed to communicate with the client. iTerm provides a single global [Connection](https://iterm2.com/python-api/connection.html) API through which all requests with the terminal is made.
 
 ##### CommandHandler
 
-`CommandHandler` supports four commands:
+`CommandHandler` supports these commands:
+
 - `COMMAND_TYPE_GET_EDITOR_STATE`, which uses the [Prompt](https://iterm2.com/python-api/prompt.html), [Session](https://iterm2.com/python-api/session.html) and [Screen](https://iterm2.com/python-api/screen.html) API to get the source (drafted command at the prompt) and cursor
-- `COMMAND_TYPE_DIFF`, which determines the adjustments to the source and cursor needed, and responds to the client to perform some subset of moving the cursor, deleting a number of characters, and inserting additional characters
-- `COMMAND_TYPE_UNDO`, which uses an internal stack of commands to send an inverse of a previous command to the client via `COMMAND_TYPE_DIFF`
-- `COMMAND_TYPE_REDO`, which sends previous commands to the client via `COMMAND_TYPE_DIFF`
+
+Changes that are tested for editor state correctness:
+- A new shell session (window, tab, or pane) is created
+- A command is executed successfully
+- A command is cancelled with control+C
+- A new shell session is created via SSH
+- A shell session is ended with control+D
+- The screen is cleared with control+K
+- A long command wraps to the next line
+- A REPL such as `python` or `node is started or exited
+- Commands are executed within a REPL
+- A "full-screen app" such as `vim`, `less`, or `htop` is started and exited
+
+Known bugs:
+- Lines that wrap after the session is resized will have inaccurate cursor counts
+- A `^@` control code appears in the string returned by the iTerm API when control+L is pressed after there is a space in the command, which causes the source and cursor to be inaccurate

@@ -1,165 +1,164 @@
 import iterm2
 
-from build_command import build_command
-from count_cursor import count_cursor
+
+DEBUG = False
+
+
+def log(*args):
+    if DEBUG:
+        print("CoH:", *args)
 
 
 class CommandHandler:
-    def __init__(self, connection):
+    def __init__(self, connection, session_id, session):
         self.connection = connection
-        self.undo_index = 0
-        self.command_stack = []
-        self.last_command_was_use = False
-        pass
+        self.session_id = session_id
+        self.session = session
+
+        # Editor state
+        self.command_start_coords = None
+        self.clear_screen_pressed = False
+        self.last_line = None
+        self.update_on_render = True
+
+    async def keyboard_listener(self):
+        async with iterm2.KeystrokeMonitor(self.connection, self.session_id) as mon:
+            while True:
+                keystroke = await mon.async_get()
+                await self.check_keystroke(keystroke)
+
+    async def screen_listener(self):
+        async with self.session.get_screen_streamer() as streamer:
+            while True:
+                screen_contents = await streamer.async_get()
+                line_info = await self.session.async_get_line_info()
+                line_changed = False
+
+                # We're on a different line than before
+                if self.command_start_coords and self.command_start_coords.y != screen_contents.cursor_coord.y:
+                    line_changed = True
+                    # Unless the new line is from a wrapped line, so try to look up 2 lines and see if it's the same
+                    current_line = (
+                        screen_contents.cursor_coord.y - line_info.first_visible_line_number
+                    )
+                    if screen_contents.number_of_lines > current_line > 2 and screen_contents.line(current_line - 2).string == self.last_line:
+                        line_changed = False
+                    # Otherwise update the last line if we can
+                    elif screen_contents.number_of_lines > current_line > 1:
+                        self.last_line = screen_contents.line(current_line - 1).string
+
+                log("Screen output changed, update_on_render is", self.update_on_render)
+                if self.update_on_render:
+                    await self.update_prompt(screen_contents=screen_contents)
+                elif line_changed:
+                    log("Updating prompt since line_changed")
+                    await self.update_prompt(screen_contents=screen_contents)
+                elif DEBUG:
+                    source, cursor = await self.get_prompt_and_cursor(screen_contents=screen_contents)
+                    log(f"editorState: '{source}', {cursor}")
+
+    async def check_keystroke(self, keystroke):
+        # Clearing the screen with control+L doesn't remove the command
+        if (
+            iterm2.keyboard.Modifier.CONTROL in keystroke.modifiers
+            and keystroke.keycode == iterm2.keyboard.Keycode.ANSI_L
+        ):
+            self.clear_screen_pressed = True
+            self.update_on_render = True
+            self.last_line = None
+        # For enter, control+C, and control+D, clear the state so we can update the cursor
+        elif keystroke.keycode == iterm2.keyboard.Keycode.RETURN or (
+            iterm2.keyboard.Modifier.CONTROL in keystroke.modifiers
+            and (keystroke.keycode == iterm2.keyboard.Keycode.ANSI_C or
+                 keystroke.keycode == iterm2.keyboard.Keycode.ANSI_D)
+        ):
+            self.update_on_render = True
+            self.last_line = None
+        else:
+            self.update_on_render = False
 
     async def handle(self, response):
         result = None
 
-        # print(response)
         if response.get("execute"):
             for command in response.get("execute").get("commandsList"):
                 command_type = command.get("type")
-
-                if command_type == "COMMAND_TYPE_DIFF":
-                    if self.last_command_was_use:
-                        result = await self.diff(command, "use")
-                        self.last_command_was_use = False
-                    else:
-                        result = await self.diff(command)
                 if command_type == "COMMAND_TYPE_GET_EDITOR_STATE":
-                    result = await self.get_editor_state()
-                if command_type == "COMMAND_TYPE_UNDO":
-                    result = await self.undo()
-                    self.last_command_was_use = False
-                if command_type == "COMMAND_TYPE_REDO":
-                    result = await self.redo()
-                    self.last_command_was_use = False
-                if command_type == "COMMAND_TYPE_USE":
-                    self.last_command_was_use = True
-                    result = {
-                        "message": "completed"
-                    }
-
-                # print(command)
-
+                    result = await self.get_editor_state(limited=command.get("limited"))
         return result
 
-    async def diff(self, data, command_type=""):
-        # print("diff", data, command_type)
-
-        source, cursor = await self.get_prompt_and_cursor()
-
-        text = data.get("insertDiff", "")
-        if text.endswith("\n"):
-            text = text[:-1]
-
-        delete = data.get("deleteEnd") is not None and \
-            data.get("deleteStart") is not None and \
-            data.get("deleteEnd") - data.get("deleteStart") != 0
-        new_cursor = data.get("deleteEnd") if delete else \
-            (cursor if text else data.get("cursor"))
-
-        delete_count = data.get("deleteEnd", 0) - data.get("deleteStart", 0)
-        cursor_adjustment = new_cursor - cursor
-
-        # For undo commands, manually calculate the adjustments to the cursor, and deletes or inserts
-        if command_type == "undo":
-            delete_count = len(data.get("insertDiff", ""))
-            if delete:
-                cursor_adjustment = data.get("deleteStart", 0) - cursor + delete_count
-            else:
-                cursor_adjustment = data.get("prev_cursor") - cursor + delete_count
-            text = data.get("deleted", "")
-        # No action is needed for redo commands since the original command is passed in again
-        elif command_type == "redo":
-            pass
-        # Otherwise, append the original command (with additional data about the current state) to the
-        # command stack so we can undo it later
-        else:
-            data["prev_cursor"] = cursor
-            if delete:
-                # print("Deleting from", source, data.get("deleteStart"), data.get("deleteEnd"))
-                data["deleted"] = source[data.get("deleteStart"):data.get("deleteEnd")]
-            # If it's a use command, push this as the last valid command
-            if command_type == "use":
-                # Remember the original command's deleted text
-                data["deleted"] = self.command_stack[self.undo_index - 1].get("deleted", "")
-                if data["deleted"].endswith("\n"):
-                    data["deleted"] = data["deleted"][:-1]
-                self.command_stack = self.command_stack[0:self.undo_index - 1]
-                self.undo_index -= 1
-            # Otherwise, ensure it's the last command in the stack
-            else:
-                self.command_stack = self.command_stack[0:self.undo_index]
-            self.command_stack.append(data)
-            self.undo_index += 1
-
-        # Don't delete anything if it's a use command, since the client will do it for us immediately.
-        if command_type == "use":
-            cursor_adjustment = 0
-            delete_count = 0
-
-        # print("Adjusting cursor by", cursor_adjustment)
-        # print("Deleting by", delete_count)
-        # print("Inserting", text)
-
-        return {
-            "message": "applyDiff",
-            "data": {
-                "adjustCursor": cursor_adjustment,
-                "deleteCount": delete_count,
-                "text": text,
-                # Tell the client to not automatically press backspace if this is an undo command.
-                "skipBackspace": True,
+    async def get_editor_state(self, limited):
+        if limited:
+            return {
+                "message": "editorState",
+                "data": {
+                    "filename": "iterm.sh",
+                },
             }
-        }
 
-    async def undo(self):
-        self.undo_index -= 1
-        if self.undo_index < 0:
-            self.undo_index = 0
-            return {}
-
-        undo_command = self.command_stack[self.undo_index]
-        result = await self.diff(undo_command, "undo")
-        return result
-
-    async def redo(self):
-        self.undo_index += 1
-        if self.undo_index > len(self.command_stack):
-            self.undo_index = len(self.command_stack)
-            return {}
-
-        redo_command = self.command_stack[self.undo_index - 1]
-        result = await self.diff(redo_command, "redo")
-        return result
-
-    async def get_prompt_and_cursor(self):
-        app = await iterm2.async_get_app(self.connection)
-        if app.current_window is None:
-            return "", 0
-        session = app.current_window.current_tab.current_session
-        prompt = await iterm2.async_get_last_prompt(self.connection, session.session_id)
-        if prompt:
-            command_coord = prompt.command_range.start
-            screen_contents = await session.async_get_screen_contents()
-            line_info = await session.async_get_line_info()
-            cursor_coord = screen_contents.cursor_coord
-            command = build_command(command_coord, screen_contents, line_info)
-            cursor = count_cursor(command_coord, cursor_coord, session.grid_size.width)
-            if cursor > len(command):
-                return command, len(command)
-            return command, cursor
-        return "", 0
-
-    async def get_editor_state(self):
         source, cursor = await self.get_prompt_and_cursor()
-        # print(source, cursor)
+        log(f"editorState: '{source}', {cursor}")
         return {
             "message": "editorState",
             "data": {
                 "source": source,
                 "cursor": cursor,
                 "filename": "iterm.sh",
-            }
+            },
         }
+
+    async def get_prompt_and_cursor(self, screen_contents=None):
+        if screen_contents is None:
+            screen_contents = await self.session.async_get_screen_contents()
+        source, line_count = await self.get_source(screen_contents=screen_contents)
+        # If the cursor is on the first character of the next line, that counts as a line
+        line_count = max(
+            screen_contents.cursor_coord.y - self.command_start_coords.y + 1, line_count
+        )
+        # BUG: self.session.grid_size.width does not seem to update when the session
+        # is resized, so the calculation here becomes incorrect
+        cursor = (
+            screen_contents.cursor_coord.x
+            - self.command_start_coords.x
+            + self.session.grid_size.width * (line_count - 1)
+        )
+        if len(source) < cursor:
+            source += " " * (cursor - len(source))
+        return source, cursor
+
+    async def update_prompt(self, screen_contents=None):
+        if screen_contents is None:
+            screen_contents = await self.session.async_get_screen_contents()
+        # When the screen is cleared, then we only want to update the row, since
+        # there might be text in the prompt already
+        if self.clear_screen_pressed:
+            self.command_start_coords.y = screen_contents.cursor_coord.y
+            self.clear_screen_pressed = False
+        else:
+            self.command_start_coords = screen_contents.cursor_coord
+
+    async def get_source(self, screen_contents=None):
+        if screen_contents is None:
+            screen_contents = await self.session.async_get_screen_contents()
+        line_info = await self.session.async_get_line_info()
+        command_start_line = (
+            self.command_start_coords.y - line_info.first_visible_line_number
+        )
+
+        command = ""
+        i = command_start_line
+        while i < screen_contents.number_of_lines:
+            line = screen_contents.line(i).string
+            # We stop after the first empty line
+            if len(line.rstrip()) == 0:
+                break
+            # The first line should be offset by the x-coordinate of the command.
+            if i == command_start_line:
+                command += line[self.command_start_coords.x :]
+            # The last line should have whitespace trimmed with no newlines
+            elif i == screen_contents.number_of_lines - 1:
+                command += line.rstrip()
+            else:
+                command += line
+            i += 1
+        return command.rstrip(), i - command_start_line
