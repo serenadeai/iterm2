@@ -30,7 +30,7 @@ If you prefer to not run an installation script directly, you can view it at htt
 
 Run the following to uninstall the shell integration and Serenade scripts:
 
-   curl https://raw.githubusercontent.com/serenadeai/iterm2/main/uninstall.sh | bash
+    curl https://raw.githubusercontent.com/serenadeai/iterm2/main/uninstall.sh | bash
 
 ## Development
 
