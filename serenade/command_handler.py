@@ -31,12 +31,12 @@ class CommandHandler:
         async with self.session.get_screen_streamer() as streamer:
             while True:
                 screen_contents = await streamer.async_get()
-                line_info = await self.session.async_get_line_info()
                 line_changed = False
 
                 # We're on a different line than before
                 if self.command_start_coords and self.command_start_coords.y != screen_contents.cursor_coord.y:
                     line_changed = True
+                    line_info = await self.session.async_get_line_info()
                     # Unless the new line is from a wrapped line, so try to look up 2 lines and see if it's the same
                     current_line = (
                         screen_contents.cursor_coord.y - line_info.first_visible_line_number
