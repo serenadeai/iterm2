@@ -16,6 +16,8 @@ class CommandHandler:
         self.session = session
 
         # Editor state
+        self.back_search_pressed = False
+        self.back_search_mode = False
         self.command_start_coords = None
         self.clear_screen_pressed = False
         self.last_line = None
@@ -38,10 +40,9 @@ class CommandHandler:
                     line_changed = True
                     line_info = await self.session.async_get_line_info()
                     # Unless the new line is from a wrapped line, so try to look up 2 lines and see if it's the same
-                    current_line = (
-                        screen_contents.cursor_coord.y - line_info.first_visible_line_number
-                    )
-                    if screen_contents.number_of_lines > current_line > 2 and screen_contents.line(current_line - 2).string == self.last_line:
+                    current_line = (screen_contents.cursor_coord.y - line_info.first_visible_line_number)
+                    if screen_contents.number_of_lines > current_line > 2 and \
+                            screen_contents.line(current_line - 2).string == self.last_line:
                         line_changed = False
                     # Otherwise update the last line if we can
                     elif screen_contents.number_of_lines > current_line > 1:
@@ -53,24 +54,40 @@ class CommandHandler:
                 elif line_changed:
                     log("Updating prompt since line_changed")
                     await self.update_prompt(screen_contents=screen_contents)
+                elif self.back_search_mode:
+                    line_info = await self.session.async_get_line_info()
+                    current_line = (screen_contents.cursor_coord.y - line_info.first_visible_line_number)
+                    if screen_contents.number_of_lines > current_line and \
+                            screen_contents.line(current_line + 1).string.rstrip() == "":
+                        log("Updating prompt since back search mode ended")
+                        await self.update_prompt(screen_contents=screen_contents)
                 elif DEBUG:
                     source, cursor = await self.get_prompt_and_cursor(screen_contents=screen_contents)
                     log(f"editorState: '{source}', {cursor}")
 
     async def check_keystroke(self, keystroke):
-        # Clearing the screen with control+L doesn't remove the command
+        # Clearing the screen with control+L doesn't remove the command, so set a flag
         if (
             iterm2.keyboard.Modifier.CONTROL in keystroke.modifiers
             and keystroke.keycode == iterm2.keyboard.Keycode.ANSI_L
         ):
             self.clear_screen_pressed = True
-            self.update_on_render = True
-            self.last_line = None
-        # For enter, control+C, and control+D, clear the state so we can update the cursor
-        elif keystroke.keycode == iterm2.keyboard.Keycode.RETURN or (
+        elif (
             iterm2.keyboard.Modifier.CONTROL in keystroke.modifiers
-            and (keystroke.keycode == iterm2.keyboard.Keycode.ANSI_C or
-                 keystroke.keycode == iterm2.keyboard.Keycode.ANSI_D)
+            and keystroke.keycode == iterm2.keyboard.Keycode.ANSI_R
+        ):
+            self.back_search_pressed = True
+
+        # For enter, control+C, control+D, control+L, and control+R,
+        # clear the state so we can update the cursor
+        if keystroke.keycode == iterm2.keyboard.Keycode.RETURN or (
+            iterm2.keyboard.Modifier.CONTROL in keystroke.modifiers
+            and (keystroke.keycode in [
+                iterm2.keyboard.Keycode.ANSI_C,
+                iterm2.keyboard.Keycode.ANSI_D,
+                iterm2.keyboard.Keycode.ANSI_L,
+                iterm2.keyboard.Keycode.ANSI_R
+                ])
         ):
             self.update_on_render = True
             self.last_line = None
@@ -115,6 +132,9 @@ class CommandHandler:
         line_count = max(
             screen_contents.cursor_coord.y - self.command_start_coords.y + 1, line_count
         )
+        # In back-search mode, the cursor is always at the end of the source
+        if self.back_search_mode:
+            return source.rstrip("_"), len(source) - 1
         # BUG: self.session.grid_size.width does not seem to update when the session
         # is resized, so the calculation here becomes incorrect
         cursor = (
@@ -132,9 +152,25 @@ class CommandHandler:
         # When the screen is cleared, then we only want to update the row, since
         # there might be text in the prompt already
         if self.clear_screen_pressed:
+            log("Clear screen pressed")
             self.command_start_coords.y = screen_contents.cursor_coord.y
             self.clear_screen_pressed = False
+            self.back_search_mode = False
+            self.back_search_pressed = False
+        elif self.back_search_pressed:
+            log("Setting back search mode")
+            # Don't update the prompt location but remember that we're in back search mode
+            self.back_search_mode = True
+            self.back_search_pressed = False
+        elif self.back_search_mode:
+            log("Exiting back search mode")
+            # Don't update the prompt location but exit the mode
+            self.back_search_mode = False
+            self.back_search_pressed = False
         else:
+            log("Setting new coordinates")
+            self.back_search_mode = False
+            self.back_search_pressed = False
             self.command_start_coords = screen_contents.cursor_coord
 
     async def get_source(self, screen_contents=None):
@@ -144,6 +180,11 @@ class CommandHandler:
         command_start_line = (
             self.command_start_coords.y - line_info.first_visible_line_number
         )
+        x_offset = self.command_start_coords.x
+        # In back-search mode, the command_start_line is one after the current line,
+        # and the offset is either "bck-i-search: " or "failing bck-i-search: "
+        if self.back_search_mode:
+            command_start_line += 1
 
         command = ""
         i = command_start_line
@@ -154,7 +195,10 @@ class CommandHandler:
                 break
             # The first line should be offset by the x-coordinate of the command.
             if i == command_start_line:
-                command += line[self.command_start_coords.x :]
+                if self.back_search_mode:
+                    command += line.replace("failing bck-i-search: ", "").replace("bck-i-search: ", "")
+                else:
+                    command += line[x_offset :]
             # The last line should have whitespace trimmed with no newlines
             elif i == screen_contents.number_of_lines - 1:
                 command += line.rstrip()
