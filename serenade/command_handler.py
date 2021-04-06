@@ -57,8 +57,9 @@ class CommandHandler:
                 elif self.back_search_mode:
                     line_info = await self.session.async_get_line_info()
                     current_line = (screen_contents.cursor_coord.y - line_info.first_visible_line_number)
-                    if screen_contents.number_of_lines > current_line and \
-                            screen_contents.line(current_line + 1).string.rstrip() == "":
+                    if screen_contents.number_of_lines > current_line + 1 > 0 and \
+                            screen_contents.line(current_line + 1).string.rstrip() == "" and \
+                            not screen_contents.line(current_line).string.startswith("(reverse-i-search)"):
                         log("Updating prompt since back search mode ended")
                         await self.update_prompt(screen_contents=screen_contents)
                 elif DEBUG:
@@ -134,7 +135,8 @@ class CommandHandler:
         )
         # In back-search mode, the cursor is always at the end of the source
         if self.back_search_mode:
-            return source.rstrip("_"), len(source) - 1
+            source = source.rstrip("_")
+            return source, len(source)
         # BUG: self.session.grid_size.width does not seem to update when the session
         # is resized, so the calculation here becomes incorrect
         cursor = (
@@ -196,7 +198,10 @@ class CommandHandler:
             # The first line should be offset by the x-coordinate of the command.
             if i == command_start_line:
                 if self.back_search_mode:
-                    command += line.replace("failing bck-i-search: ", "").replace("bck-i-search: ", "")
+                    if line.startswith("failing bck-i-search: "):
+                        command += line.replace("failing bck-i-search: ", "")
+                    elif line.startswith("bck-i-search: "):
+                        command += line.replace("bck-i-search: ", "")
                 else:
                     command += line[x_offset :]
             # The last line should have whitespace trimmed with no newlines
